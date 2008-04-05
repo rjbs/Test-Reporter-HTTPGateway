@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+use 5.006;
 
 package Test::Reporter::HTTPGateway;
 
@@ -65,6 +66,8 @@ sub destination {
 This method returns true if the user key given in the HTTP request is
 acceptable for posting a report.
 
+Users wishing to operate a secure gateway should override this method.
+
 =cut
 
 sub key_allowed { 1 };
@@ -102,10 +105,11 @@ sub handle {
     # This was causing "cgi died ?" under lighttpd.  Eh. -- rjbs, 2008-04-05
     # die [ 405 => undef ] unless $q->request_method eq 'POST';
 
-    for (qw(from subject via)) {
+    for (qw(from subject via report)) {
       die [ 500 => "missing $_ field" ]
         unless defined $post{$_} and length $post{$_};
 
+      next if $_ eq 'report';
       die [ 500 => "invalid $_ field" ] if $post{$_} =~ /[\r\n]/;
     }
 
