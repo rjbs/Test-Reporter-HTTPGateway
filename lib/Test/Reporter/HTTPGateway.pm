@@ -8,12 +8,24 @@ use Email::Send ();
 use Email::Simple;
 use Email::Simple::Creator;
 
-my  $NAME    = __PACKAGE__;
 our $VERSION = '0.001';
 
-my $MAILER  = $ENV{TEST_REPORTER_HTTPGATEWAY_MAILER}  || 'SMTP';
-my $ADDRESS = $ENV{TEST_REPORTER_HTTPGATEWAY_ADDRESS} || 'rjbs@cpan.org';
-          #|| 'cpan-testers@perl.org';
+sub via {
+  my ($self) = @_;
+  return ref $self ? ref $self : $self;
+}
+
+sub default_mailer { 'SMTP' }
+sub mailer { $ENV{TEST_REPORTER_HTTPGATEWAY_MAILER} || $_[0]->default_mailer }
+
+sub default_destination {
+  'rjbs@cpan.org';
+  # 'cpan-testers@perl.org';
+}
+
+sub destination {
+  $ENV{TEST_REPORTER_HTTPGATEWAY_ADDRESS} || $_[0]->default_destination;
+}
 
 sub key_allowed { 1 };
 
@@ -29,8 +41,6 @@ sub handle {
     key     => scalar $q->param('key'),
   );
 
-  # http://rjbs.manxome.org/testy.cgi?from=rjbs@cpan.org&subject=testing-thing&via=manual&report=this%20is%20the%20report&key=1
-
   eval {
     # This was causing "cgi died ?" under lighttpd.  Eh. -- rjbs, 2008-04-05
     # die [ 405 => undef ] unless $q->request_method eq 'POST';
@@ -44,17 +54,19 @@ sub handle {
 
     die [ 403 => "unknown user key" ] unless $self->key_allowed($post{key});
 
+    my $via = $self->via;
+
     my $email = Email::Simple->create(
       body   => $post{report},
       header => [
-        To      => $ADDRESS,
+        To      => $self->destination,
         From    => $post{from},
         Subject => $post{subject},
-        'X-Reported-Via' => "$NAME $VERSION relayed from $post{via}",
+        'X-Reported-Via' => "$via $VERSION relayed from $post{via}",
       ],
     );
 
-    my $rv = Email::Send->new({ mailer => $MAILER })->send($email);
+    my $rv = Email::Send->new({ mailer => $self->mailer })->send($email);
     die "$rv" unless $rv; # I hate you, Return::Value -- rjbs, 2008-04-05
   };
 
@@ -70,13 +82,20 @@ sub handle {
     $status = 500 unless $status and $status =~ /\A\d{3}\z/;
     $msg  ||= 'internal error';
 
-    print "Status: $status\n";
-    print "Content-type: text/plain\n\n";
-    print "Report not sent: $msg\n";
+    $self->_respond($status, "Report not sent: $msg");
+    return;
   } else {
-    print "Content-type: text/plain\n\n";
-    print "Report sent.\n";
+    $self->_respond(200, 'Report sent.');
+    return;
   }
+}
+
+sub _respond {
+  my ($self, $code, $msg) = @_;
+
+  print "Status: $code\n";
+  print "Content-type: text/plain\n\n";
+  print "$msg\n";
 }
 
 1;
