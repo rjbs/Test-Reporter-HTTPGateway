@@ -50,10 +50,7 @@ cpan-testers address.
 
 =cut
 
-sub default_destination {
-  'rjbs@cpan.org';
-  # 'cpan-testers@perl.org';
-}
+sub default_destination { 'cpan-testers@perl.org' }
 
 sub destination {
   $ENV{TEST_REPORTER_HTTPGATEWAY_ADDRESS} || $_[0]->default_destination;
