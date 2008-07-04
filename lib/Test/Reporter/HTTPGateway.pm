@@ -110,6 +110,19 @@ sub handle {
       die [ 500 => "invalid $_ field" ] if $post{$_} =~ /[\r\n]/;
     }
 
+    die [ 500 => "invalid subject field" ] unless $post{subject} =~ /
+      ^
+      (?:PASS|FAIL|NA|UNKNOWN)
+      \s
+        [-_0-9a-zA-Z+.]+
+        -
+        (?:[._0-9a-zA-Z]+|undef)
+      \s
+    /x;
+
+    die [ 500 => "invalid body field" ]
+      unless $post{body} =~ /This is a computer-generated report/;
+
     die [ 403 => "unknown user key" ] unless $self->key_allowed($post{key});
 
     my $via = $self->via;
